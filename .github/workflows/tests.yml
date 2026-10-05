@@ -41,7 +41,7 @@ jobs:
         pytest --cov=src/text_analyzer --cov-report=xml --cov-report=term-missing
 
     - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v3
+      uses: codecov/codecov-action@ab904c41d6ece82784817410c45d8b8c02684457 # v3.1.6
       with:
         file: ./coverage.xml
         flags: unittests
@@ -51,7 +51,7 @@ jobs:
 
     - name: Comment PR with test results
       if: github.event_name == 'pull_request'
-      uses: actions/github-script@v7
+      uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
       with:
         script: |
           const fs = require('fs');
