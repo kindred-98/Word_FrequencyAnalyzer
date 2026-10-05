@@ -56,7 +56,7 @@ def read_text_file(file_path: str, encoding: str = "utf-8") -> str:
         except UnicodeDecodeError as e:
             last_error = e
             continue
-        except (PermissionError, OSError) as e:
+        except OSError as e:
             raise FileReadError(f"Error de permisos o acceso: {e}")
 
     # Si ningún encoding funcionó, lanzamos excepción
@@ -74,7 +74,7 @@ def write_text_file(file_path: str, content: str, encoding: str = "utf-8") -> No
     try:
         with open(path, "w", encoding=encoding) as f:
             f.write(content)
-    except (PermissionError, OSError) as e:
+    except OSError as e:
         raise FileWriteError(f"Error escribiendo {file_path}: {e}")
 
 

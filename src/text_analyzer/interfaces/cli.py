@@ -5,6 +5,7 @@ from rich.table import Table
 from rich.progress import track
 
 from collections import Counter
+import re
 import time
 
 from text_analyzer.core.analyzer import analyze_single_word, analyze_text, AnalysisResult, AnalysisConfig
@@ -15,6 +16,20 @@ from text_analyzer.errors.error_handler import handle_error
 logger = setup_logger()
 console = Console()
 historial = []
+
+# ===============================
+# MENSAJES REUTILIZABLES
+# ===============================
+MSG_FORMATO_INVALIDO = "[red]Formato inválido[/red]"
+MSG_SIN_TEXTO = "[red]Aún no has analizado ningún texto. Ve al menú y usa la opción 1 primero.[/red]"
+MSG_SIN_PALABRA = "[red]Aún no has analizado ninguna palabra. Ve al menú y usa la opción 2 primero.[/red]"
+
+OPCION_TEXTO_DISPONIBLE = "[green]1) Análisis de texto completo[/green]"
+OPCION_TEXTO_NO_DISPONIBLE = "[dim]1) Análisis de texto completo — no disponible (usa opción 1 del menú primero)[/dim]"
+OPCION_PALABRA_DISPONIBLE = "[yellow]2) Análisis de palabra específica[/yellow]"
+OPCION_PALABRA_NO_DISPONIBLE = "[dim]2) Análisis de palabra específica — no disponible (usa opción 2 del menú primero)[/dim]"
+
+PATRON_PALABRA = r"\b[a-zA-ZáéíóúüñÁÉÍÓÚÜÑ]+\b"
 
 # ===============================
 # Nuevo: ultimo_resultado ahora es AnalysisResult
@@ -96,9 +111,7 @@ def analizar_palabra(texto):
     palabra_input = Prompt.ask("Ingresa la palabra a analizar 🔍")
     palabra = palabra_input.lower()  # solo para conteo interno
 
-    import re as _re
-    _PATRON = r"\b[a-zA-ZáéíóúüñÁÉÍÓÚÜÑ]{1,}\b"
-    palabras_normalizadas = _re.findall(_PATRON, ultimo_resultado.normalized_text) if ultimo_resultado else []
+    palabras_normalizadas = re.findall(PATRON_PALABRA, ultimo_resultado.normalized_text) if ultimo_resultado else []
     contador = ultimo_resultado.word_frequencies.get(palabra, 0) if ultimo_resultado else 0
     posiciones = [i + 1 for i, p in enumerate(palabras_normalizadas) if p == palabra]
 
@@ -178,37 +191,38 @@ def ver_historial():
 # ===============================
 # EXPORTAR RESULTADOS
 # ===============================
-def exportar_resultados():
-    if not ultimo_resultado and not ultimo_resultado_palabra:
-        logger.warning("CLI: intento de exportar sin análisis previo")
-        console.print("[red]Primero debes analizar un texto o una palabra.[/red]")
-        return
+def elegir_objetivo_exportacion() -> str | None:
+    """
+    Muestra las opciones de exportación y devuelve el objetivo elegido
+    ("texto" o "palabra"), o None si no se puede exportar.
+    """
 
     console.print("\n[bold cyan]¿Qué quieres exportar?[/bold cyan]")
-    if ultimo_resultado:
-        console.print("[green]1) Análisis de texto completo[/green]")
-    else:
-        console.print("[dim]1) Análisis de texto completo — no disponible (usa opción 1 del menú primero)[/dim]")
-    if ultimo_resultado_palabra:
-        console.print("[yellow]2) Análisis de palabra específica[/yellow]")
-    else:
-        console.print("[dim]2) Análisis de palabra específica — no disponible (usa opción 2 del menú primero)[/dim]")
+    console.print(OPCION_TEXTO_DISPONIBLE if ultimo_resultado else OPCION_TEXTO_NO_DISPONIBLE)
+    console.print(OPCION_PALABRA_DISPONIBLE if ultimo_resultado_palabra else OPCION_PALABRA_NO_DISPONIBLE)
 
     tipo = Prompt.ask("Selecciona qué exportar (1 o 2)")
 
     if tipo == "1":
         if not ultimo_resultado:
-            console.print("[red]Aún no has analizado ningún texto. Ve al menú y usa la opción 1 primero.[/red]")
-            return
-        objetivo = "texto"
-    elif tipo == "2":
+            console.print(MSG_SIN_TEXTO)
+            return None
+        return "texto"
+
+    if tipo == "2":
         if not ultimo_resultado_palabra:
-            console.print("[red]Aún no has analizado ninguna palabra. Ve al menú y usa la opción 2 primero.[/red]")
-            return
-        objetivo = "palabra"
-    else:
-        console.print("[red]Formato inválido[/red]")
-        return
+            console.print(MSG_SIN_PALABRA)
+            return None
+        return "palabra"
+
+    console.print(MSG_FORMATO_INVALIDO)
+    return None
+
+
+def elegir_formato_exportacion() -> str:
+    """
+    Muestra los formatos disponibles y devuelve la opción elegida.
+    """
 
     console.print("\n[bold cyan]Formato de exportación[/bold cyan]")
     console.print("1) TXT")
@@ -216,22 +230,39 @@ def exportar_resultados():
     console.print("3) CSV")
     console.print(f"[dim]Los archivos se guardarán en:[/dim] {EXPORT_DIR}")
 
-    opcion = Prompt.ask("Selecciona formato")
+    return Prompt.ask("Selecciona formato")
+
+
+def obtener_exportador(objetivo: str, opcion: str):
+    """
+    Devuelve la función exportadora correspondiente, o None si el formato no existe.
+    """
 
     if objetivo == "texto":
-        exportadores = {"1": export_txt, "2": export_json, "3": export_csv}
-        fn = exportadores.get(opcion)
-        if not fn:
-            console.print("[red]Formato inválido[/red]")
-            return
-        filename = fn(ultimo_resultado)
-    else:
-        exportadores = {"1": export_word_txt, "2": export_word_json, "3": export_word_csv}
-        fn = exportadores.get(opcion)
-        if not fn:
-            console.print("[red]Formato inválido[/red]")
-            return
-        filename = fn(ultimo_resultado_palabra)
+        return {"1": export_txt, "2": export_json, "3": export_csv}.get(opcion)
+
+    return {"1": export_word_txt, "2": export_word_json, "3": export_word_csv}.get(opcion)
+
+
+def exportar_resultados():
+    if not ultimo_resultado and not ultimo_resultado_palabra:
+        logger.warning("CLI: intento de exportar sin análisis previo")
+        console.print("[red]Primero debes analizar un texto o una palabra.[/red]")
+        return
+
+    objetivo = elegir_objetivo_exportacion()
+
+    if objetivo is None:
+        return
+
+    fn = obtener_exportador(objetivo, elegir_formato_exportacion())
+
+    if not fn:
+        console.print(MSG_FORMATO_INVALIDO)
+        return
+
+    datos = ultimo_resultado if objetivo == "texto" else ultimo_resultado_palabra
+    filename = fn(datos)
 
     logger.info(f"CLI: resultados exportados a {filename}")
     console.print(f"[green]Archivo exportado:[/green] {filename}")

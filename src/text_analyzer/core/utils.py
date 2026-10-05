@@ -26,7 +26,7 @@ def extract_words(text: str, config: AnalysisConfig) -> List[str]:
     if not text:
         return []
 
-    words = re.findall(r"\b[a-zA-ZáéíóúüñÁÉÍÓÚÜÑ]{1,}\b", text)
+    words = re.findall(r"\b[a-zA-ZáéíóúüñÁÉÍÓÚÜÑ]+\b", text)
     min_len = getattr(config, "min_word_length", 1)
     words = [w for w in words if len(w) >= min_len]
 
@@ -41,7 +41,7 @@ def extract_words(text: str, config: AnalysisConfig) -> List[str]:
 def count_sentences(text: str) -> int:
     if not text or not text.strip():
         return 0
-    pattern = r'(?<!\w\.\w.)(?<![A-Z][a-z]\.)(?<=\.|\?|\!)\s'
+    pattern = r'(?<!\w\.\w.)(?<![A-Z][a-z]\.)(?<=[.?!])\s'
     sentences = re.split(pattern, text)
     return len([s for s in sentences if s.strip()])
 

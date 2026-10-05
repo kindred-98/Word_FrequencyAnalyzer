@@ -8,6 +8,12 @@ from dataclasses import dataclass
 
 VOWELS = "aeiouáéíóúü"
 
+STRESS_BY_POSITION = {
+    1: "aguda",
+    2: "grave",
+    3: "esdrújula",
+}
+
 
 @dataclass
 class WordAnalysis:
@@ -40,6 +46,21 @@ def has_accent(word: str) -> bool:
     return any(c in "áéíóú" for c in word.lower())
 
 
+def find_accent_position(syllables: list[str]) -> int | None:
+    """
+    Devuelve la posición de la sílaba tildada contando desde el final,
+    o None si ninguna sílaba tiene tilde.
+    """
+
+    count = len(syllables)
+
+    for index, syllable in enumerate(syllables):
+        if has_accent(syllable):
+            return count - index
+
+    return None
+
+
 def detect_stress_type(word: str, syllables: list[str]) -> str:
     """
     Determina si es:
@@ -55,20 +76,10 @@ def detect_stress_type(word: str, syllables: list[str]) -> str:
         return "monosílaba"
 
     if has_accent(word):
+        position = find_accent_position(syllables)
 
-        for i, syllable in enumerate(syllables):
-            if any(c in "áéíóú" for c in syllable):
-
-                position = count - i
-
-                if position == 1:
-                    return "aguda"
-                elif position == 2:
-                    return "grave"
-                elif position == 3:
-                    return "esdrújula"
-                else:
-                    return "sobresdrújula"
+        if position is not None:
+            return STRESS_BY_POSITION.get(position, "sobresdrújula")
 
     # reglas generales
     if word.endswith(("n", "s")) or word[-1] in VOWELS:
