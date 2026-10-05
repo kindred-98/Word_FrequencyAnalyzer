@@ -2,7 +2,6 @@
 Módulo de análisis lingüístico de palabras en español.
 """
 
-import re
 from dataclasses import dataclass
 
 
@@ -28,10 +27,28 @@ def split_syllables(word: str) -> list[str]:
     """
     División simple aproximada de sílabas.
     No es perfecta pero funciona bien para español común.
+    Cada sílaba se forma con las consonantes que la preceden más la vocal (o
+    grupo de vocales) que las cierra.
     """
 
-    pattern = r'[^aeiouáéíóúü]*[aeiouáéíóúü]+'
-    syllables = re.findall(pattern, word.lower())
+    syllables: list[str] = []
+    consonants: list[str] = []
+    vowels = ""
+
+    for char in word.lower():
+        if char in VOWELS:
+            vowels += char
+            continue
+
+        if vowels:
+            syllables.append("".join(consonants) + vowels)
+            consonants.clear()
+            vowels = ""
+
+        consonants.append(char)
+
+    if vowels:
+        syllables.append("".join(consonants) + vowels)
 
     if not syllables:
         return [word]
